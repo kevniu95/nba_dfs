@@ -2,3 +2,4 @@ data/
 config.ini
 *.csv
 requirements.txt
+*.pkl
