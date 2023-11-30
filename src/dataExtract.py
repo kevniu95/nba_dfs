@@ -61,7 +61,7 @@ def standardizeNames(dfs : pd.DataFrame, ref : pd.DataFrame) -> (pd.DataFrame, p
     dfs['Name'] = dfs['Name'].str.replace(r'^(\S+\s\S+).*', r'\1', regex=True)
 
     ref['Player'] = ref['Player'].str.replace(r'^(\S+\s\S+).*', r'\1', regex=True)
-
+    
     dfs['Team'] = convertTeamList(dfs['Team'], DataSource.DFS.value)
     ref.rename(columns={'Player' : 'Name', 'Tm' : 'Team'}, inplace=True)
     return dfs, ref
@@ -94,6 +94,47 @@ def main():
     ref['Date'] = pd.to_datetime(ref['Date'])
     print(dfs.sort_values(['Date', 'Proj'], ascending = [True, False]).head(10))
     print(ref.sort_values(['Date', 'Total Points'], ascending = [True, False]).head(10))
+
+    lookup = pd.read_csv(f'../data/lookup/name_lookup.csv')
+
+    dfs = dfs.merge(lookup, left_on = ['Team','Name'], right_on = ['Team_dfs','Name_dfs'], how = 'outer', indicator = True)
+    print(dfs['_merge'].value_counts())
+    print(dfs.head())
+
+    dfs[['Name','Team']] = dfs[['Player_ref','Team_ref']]
+
+    print(dfs[(dfs['Name'].isnull()) | (dfs['Team'].isnull())].sort_values('Proj', ascending = False))
+    print(dfs[(dfs['Name'].isnull()) | (dfs['Team'].isnull())].sort_values('Proj', ascending = False).head(50))
+    print(ref[(ref['Date'] == '2022-11-27')] )
+
+    print(ref.head())
+    print(dfs.head())
+    
+    big = ref.merge(dfs, left_on = ['Team', 'Name', 'Date'], right_on = ['Team_ref', 'Player_ref', 'Date'], how = 'outer', indicator = '_merge2')
+    print(big.columns)
+    print(big['_merge2'].value_counts())
+    print(big.loc[big['_merge2'] == 'left_only', ['Team_x','Opp', 'Name_x','Date', 'Total Points']].sort_values('Total Points', ascending = False).head(50))
+
+    # TODO:
+    # Consider, draftkings data only has late-night, x-game slates
+    #   whereas fanduel has seemingly all games
+    # Should we switch to fanduel entirely?
+    # Or just proceed with draftkings and ignore the missing data?
+    
+
+    # print(ref['_merge'].value_counts()) 
+
+    # lookup = lookup.merge(dfs, left_on = ['Team_dfs','Name_dfs'], right_on = ['Team','Name'], how = 'outer', indicator = 'lookup_dfs_merge')
+    # lookup = lookup.merge(ref, left_on = ['Team_ref','Player_ref'], right_on = ['Team','Name'], how = 'outer', indicator = 'lookup_ref_merge')
+    # print(lookup)
+    # a = lookup.merge(dfs, left_on = ['Team_dfs','Name_dfs'], right_on = ['Team','Name'], how = 'outer', indicator = True)
+    # print(a[a['_merge'] == 'right_only'][['Team','Name']])
+    # print(a[a['_merge'] == 'left_only'][['Team_dfs','Name_dfs', 'Team_ref', 'Player_ref']])
+
+    # b = lookup.merge(ref, left_on = ['Team_ref','Player_ref'], right_on = ['Team','Name'], how = 'outer', indicator = True)
+    # print(b[b['_merge'] == 'right_only'][['Team','Name']])
+    # print(b[b['_merge'] == 'left_only'][['Team_dfs','Name_dfs', 'Team_ref', 'Player_ref']])
+
 
     
 if __name__ == '__main__':
