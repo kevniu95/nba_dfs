@@ -7,6 +7,7 @@ from util.constants import *
 from util.logger_config import setup_logger
 import re
 import glob
+pd.set_option('display.max_columns', None)
 
 logger = setup_logger(__name__)
 
@@ -99,30 +100,44 @@ def exportLookupHelpers(frames : Dict[DataSource, pd.DataFrame]) -> None:
 # ===========
 # Finalize loaded data
 # ===========
-def finalizeCombinedSet(frames : Dict[DataSource, pd.DataFrame]) -> pd.DataFrame:
+def finalizeCombinedSet(frames : Dict[DataSource, pd.DataFrame], bothOnly : bool = True) -> pd.DataFrame:
     # Split dfs, and convert dates
     dfs, ref = frames['dfs'], frames['ref']
     dfs['Date'] = pd.to_datetime(dfs['Date'])
     ref['Date'] = pd.to_datetime(ref['Date'])
 
+    # Remove J. Williams duplicates
+    dfs.loc[(dfs['Name'] == 'J. Williams') & (dfs['Team'] == 'OKC') & (dfs['Position'] != 'C'), 'Name'] = 'Jalen Williams'
+    dfs.loc[(dfs['Name'] == 'J. Williams') & (dfs['Team'] == 'OKC') & (dfs['Position'] == 'C'), 'Name'] = 'Jaylin Williams'
+    # a = dfs[dfs.duplicated(['Name','Team','Date'], keep=False)]
+    # print(a.head(30))
+
     # Get lookup names onto dfs
     lookup = pd.read_csv(f'../data/lookup/name_lookup.csv')
-    dfs = dfs.merge(lookup, left_on = ['Team','Name'], right_on = ['Team_dfs','Name_dfs'], how = 'outer', indicator = True)
-    dfs[['Name','Team']] = dfs[['Player_ref','Team_ref']]
+    dfs = dfs.merge(lookup, left_on = ['Team','Name'], right_on = ['Team_dfs','Name_dfs'], how = 'left', indicator = '_merge')
     # Every dfs player has a ref match
-        #print(dfs['_merge'].value_counts())
-        #print(dfs.head())
+        # print(dfs['_merge'].value_counts())
+        # print(dfs.head())
+        
+    dfs[['Name','Team']] = dfs[['Player_ref','Team_ref']]
+    dfs = dfs[dfs['Name'].notnull()].copy()
+    dfs.drop(columns = ['Team_dfs','Name_dfs','Team_ref','Player_ref','_merge'], inplace=True)
+    dfs.columns = [i + '_dfs' if i not in ['Team','Name','Date'] else i for i in dfs.columns]
+    ref.columns = [i + '_ref' if i not in ['Team','Name','Date'] else i for i in ref.columns ]
+    
+    # print(ref[ref.duplicated(['Team','Name','Date'], keep = False)])
+    # print(dfs[dfs.duplicated(['Team','Name','Date'], keep = False)])
 
     # Merge ref and dfs, return inner join results
-    big = ref.merge(dfs, left_on = ['Team', 'Name', 'Date'], right_on = ['Team_ref', 'Player_ref', 'Date'], how = 'outer', indicator = '_merge2')
+    big = ref.merge(dfs, left_on = ['Team', 'Name', 'Date'], right_on = ['Team', 'Name', 'Date'], how = 'outer', indicator = True)
     # 9,000 of 50,000 ref data observations don't have match in dfs
-        #print(big['_merge2'].value_counts())
+        # print(big['_merge'].value_counts())
         #print(ref.shape)
     # 20,000 of 50,000 dfs data observations don't have match in ref
     # Most are injuries / scratches
-
-    both = big[big['_merge2'] == 'both'].copy()
-    return both
+    if bothOnly:
+        return big[big['_merge'] == 'both'].copy()
+    return big
 
 def main():
     year_start = 2022
@@ -135,10 +150,10 @@ def main():
 
     # Export lookup table helpers if they don't exist
     exportLookupHelpers(frames)
-
+    
     bigFrame = finalizeCombinedSet(frames)
-    print(bigFrame.head())
-    print(bigFrame.shape)
+    # print(bigFrame.head())
+    # print(bigFrame.shape)
 
     
 if __name__ == '__main__':
