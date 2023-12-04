@@ -101,6 +101,7 @@ class DailyFantasyDataGenerator(DataGenerator):
         return df
     
     def _getDailyFantasyData(self, link : str) -> pd.DataFrame:
+        # Doesn't include players who are listed as 'out'
         req = requests.get(link)
         try:
             soup = BeautifulSoup(req.text, 'html.parser')    

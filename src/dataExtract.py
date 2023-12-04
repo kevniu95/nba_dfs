@@ -120,7 +120,7 @@ def finalizeCombinedSet(frames : Dict[DataSource, pd.DataFrame], bothOnly : bool
         # print(dfs.head())
         
     dfs[['Name','Team']] = dfs[['Player_ref','Team_ref']]
-    dfs = dfs[dfs['Name'].notnull()].copy()
+    dfs = dfs[dfs['Name'].notnull()].copy() # 61008 -> 59708
     dfs.drop(columns = ['Team_dfs','Name_dfs','Team_ref','Player_ref','_merge'], inplace=True)
     dfs.columns = [i + '_dfs' if i not in ['Team','Name','Date'] else i for i in dfs.columns]
     ref.columns = [i + '_ref' if i not in ['Team','Name','Date'] else i for i in ref.columns ]
@@ -130,10 +130,12 @@ def finalizeCombinedSet(frames : Dict[DataSource, pd.DataFrame], bothOnly : bool
 
     # Merge ref and dfs, return inner join results
     big = ref.merge(dfs, left_on = ['Team', 'Name', 'Date'], right_on = ['Team', 'Name', 'Date'], how = 'outer', indicator = True)
+    big['_merge'] = big['_merge'].replace({'left_only' : 'ref_only', 'right_only' : 'dfs_only', 'both' : 'both'})
     # 9,000 of 50,000 ref data observations don't have match in dfs
+    # A lot of these are because dk data only for some games on some days
         # print(big['_merge'].value_counts())
-        #print(ref.shape)
-    # 20,000 of 50,000 dfs data observations don't have match in ref
+        # print(ref.shape)
+    # 20,000 of 60,000 dfs data observations don't have match in ref
     # Most are injuries / scratches
     if bothOnly:
         return big[big['_merge'] == 'both'].copy()

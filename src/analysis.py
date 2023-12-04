@@ -1,6 +1,8 @@
 import os
 import pathlib
 from .dataExtract import *
+import pulp
+from .lp import *
 
 
 def initFrame(bothOnly : bool = True) -> pd.DataFrame:
@@ -13,20 +15,60 @@ def initFrame(bothOnly : bool = True) -> pd.DataFrame:
     frames['dfs'], frames['ref'] = standardizeNames(frames['dfs'], frames['ref'])
     return finalizeCombinedSet(frames, bothOnly)
 
-def main():
-    bothFrame = initFrame()
-    print(bothFrame.columns)
+def split_dates(df : pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    date_dict = {}
+    for date in df['Date'].unique():
+        date_dict[date] = df[df['Date'] == date].copy()
+    return date_dict
 
+# def processFrame(df : pd.DataFrame):
+#     prob = pulp.LpProblem("MaximalTeam", pulp.LpMaximize)
+#     player_names = df['Name'].unique()
+#     player_vars = pulp.LpVariable.dicts("Players", player_names, cat='Binary')
+#     prob += pulp.lpSum([player_vars[player] * row['Proj_dfds'] for player, row in df.iterrows()]), "TotalProjectedPoints"
+#     prob += pulp.lpSum([player_vars[player] * row['Salary_dfs'] for player, row in df.iterrows()]) <= 50000, "TotalSalary"
+#     positions = ['PG', 'SG', 'SF', 'PF', 'C', 'G', 'F', 'UTIL']
+#     for pos in positions:
+#         prob += pulp.lpSum([player_vars[player] for player, row in players_df.iterrows() if pos in row['Position']]) >= 1, f"Position_{pos}"
+
+#     # Solve the problem
+#     prob.solve()
+
+#     # Check if a valid solution was found
+#     if prob.status == 1:
+#         selected_players = [player for player in player_vars if player_vars[player].varValue > 0]
+#     else:
+#         selected_players = "No valid team could be formed within the budget constraints."
+
+#     selected_players
+
+
+
+
+
+def main():
     bigFrame = initFrame(False)
     print(bigFrame.shape)
-    print(bigFrame.head())
+    dfs_sub = bigFrame[bigFrame['_merge'].isin(['dfs_only','both'])].copy()
+    print(bigFrame['_merge'].value_counts())
 
-    a = bigFrame.merge(bothFrame[['Name','Team','Date']], how = 'left', on = ['Name','Team','Date'], indicator = '_merge2')
-    print(a['_merge'].value_counts())
-    print(bothFrame.shape)
-    sub = a[a['_merge2'] == 'both'].copy()
-    dups = sub.duplicated(['Name','Team','Date'], keep = False)
-    print(sub[dups].sort_values(['Name','Team','Date']))
+    date_dict = split_dates(dfs_sub)
+    ctr = 0
+    for date, frame in date_dict.items():
+        ctr += 1
+        print(date)
+        print(frame)
+        print(frame.columns)
+        print(doLp(frame, 'Position_dfs').sort_values('selectedPosition').head(8)[['selectedPosition','Name','Team','Opp_ref','Proj_dfs','Salary_dfs','Value_dfs','Total Points_ref']])
+        if ctr > 0: 
+            break
+        
+
+
+
+    # [print(k, v.shape) for k, v in date_dict.items()]
+    # print(date_dict[pd.to_datetime('2021-10-20')].sort_values('Proj_dfs',ascending = False))
+    # date_dict[pd.to_datetime('2021-10-20')].sort_values('Proj_dfs',ascending = False).to_csv('../data/2021-10-20.csv')
     
     
     # b = bigFrame.drop_duplicates(['Name','Team','Date'])
